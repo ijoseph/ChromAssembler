@@ -5,7 +5,7 @@
 import argparse, sys, multiprocessing
 import graphviz
 import itertools
-import scipy.special
+
 
 class Assembler(object):
     """
@@ -16,26 +16,32 @@ class Assembler(object):
         """
         Constructor
         """
+        self.assembler = assembler
+        self.output = output
 
         self.sequence_list = self.read_fasta(fragments_fasta)
 
+    def assemble(self):
+        if self.assembler == "DeBrujinGraph":
+            for k in range(8, 9):
+                dbg = DeBruijnGraph2(strIter=self.sequence_list, k=k)
 
+                self.output.write("k ={0}: {1}\n".format(k, dbg.isEulerian()))
 
-        if assembler == "DeBrujinGraph":
-            for k in range(5):
-                dbg = DeBruijnGraph2(strIter= self.sequence_list, k=k)
-
-                output.write("k ={0}: {1}\n".format(k, dbg.isEulerian()))
-                if dbg.isEulerian():
-                    output.write("".join(dbg.eulerianWalkOrCycle()) + "\n")
                 dot_file = dbg.to_dot()
-                dot_file.render(filename="{0}_smol.dot".format(k), view=True)
+                dot_file.render(filename="Figures/{0}_smol_example.dot".format(k), view=True)
 
-        elif assembler == "ShortestCommonSuperstring":
+
+                if dbg.isEulerian():
+                    # return "".join(dbg.eulerianWalkOrCycle())
+                    walk = dbg.eulerianWalkOrCycle()
+                    return walk[0] + ''.join(map(lambda x: x[-1], walk[1:]))
+
+
+
+
+        elif self.assembler == "ShortestCommonSuperstring":
             print ShortestCommonSuperstring.scs(self.sequence_list)
-
-
-
 
     def read_fasta(self, fragments_fasta):
         """
@@ -63,10 +69,10 @@ class DeBruijnGraph:
         a left k-1-mer to a right k-1-mer. """
 
     @staticmethod
-    def chop(st, k):
-        """ Chop string into k-mers of given length """
-        for i in range(len(st) - (k - 1)):
-            yield (st[i:i + k], st[i:i + k - 1], st[i + 1:i + k])
+    def chop(sequence, k):
+        """ Chop sequence into k-mers of given length """
+        for i in range(len(sequence) - (k - 1)):
+            yield (sequence[i:i + k], sequence[i:i + k - 1], sequence[i + 1:i + k])
 
     class Node:
         """ Node representing a k-1 mer.  Keep track of # of
@@ -90,24 +96,28 @@ class DeBruijnGraph:
         def __str__(self):
             return self.k_minus_1_mer
 
-    def __init__(self, strIter, k, circularize=False):
-        """ Build de Bruijn multigraph given string iterator and k-mer
-            length k """
+    def __init__(self, strIter, k):
+        """
+        Build de Bruijn multigraph given string iterator and k-mer
+            length k
+        """
         self.G = {}  # multimap from nodes to neighbors
         self.nodes = {}  # maps k-1-mers to Node objects
-        for st in strIter:
-            if circularize:
-                st += st[:k - 1]
-            for kmer, km1L, km1R in self.chop(st, k):
-                nodeL, nodeR = None, None
-                if km1L in self.nodes:
-                    nodeL = self.nodes[km1L]
+        seen_k_mers = set()
+
+        for sequence in strIter:
+            for k_mer, k_minus_1_mer_left, k_minus_1_mer_right in self.chop(sequence, k):
+                if k_mer in seen_k_mers:
+                    continue
+                seen_k_mers.add(k_mer)
+                if k_minus_1_mer_left in self.nodes:
+                    nodeL = self.nodes[k_minus_1_mer_left]
                 else:
-                    nodeL = self.nodes[km1L] = self.Node(km1L)
-                if km1R in self.nodes:
-                    nodeR = self.nodes[km1R]
+                    nodeL = self.nodes[k_minus_1_mer_left] = self.Node(k_minus_1_mer_left)
+                if k_minus_1_mer_right in self.nodes:
+                    nodeR = self.nodes[k_minus_1_mer_right]
                 else:
-                    nodeR = self.nodes[km1R] = self.Node(km1R)
+                    nodeR = self.nodes[k_minus_1_mer_right] = self.Node(k_minus_1_mer_right)
                 nodeL.out_degree += 1
                 nodeR.in_degree += 1
                 self.G.setdefault(nodeL, []).append(nodeR)
