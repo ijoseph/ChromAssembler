@@ -10,7 +10,10 @@ class DeBruijnGraphVisualize:
         """ Return string with graphviz representation.  If 'weights'
             is true, label edges corresponding to distinct k-1-mers
             with weights, instead of drawing separate edges for
-            k-1-mer copies. """
+            k-1-mer copies.
+            :return .dot file as string
+            """
+
         g = graphviz.Digraph(comment='DeBruijn graph')
         for node in iter(de_bruijn_graph.graph.keys()):
             g.node(node.k_minus_1_mer, node.k_minus_1_mer)
@@ -23,9 +26,8 @@ class DeBruijnGraphVisualize:
     def show_graph(de_bruijn_graph, temp_folder = "."):
         """
         Show graphviz plot from graph
-        :param de_bruijn_graph:
-        :param temp_folder:
-        :return:
+        :param de_bruijn_graph: Assemble.DeBruijnGraph object
+        :param temp_folder: folder to write .dot file
         """
         dot_string = DeBruijnGraphVisualize.to_dot(de_bruijn_graph)
         dot_string.render(filename=os.path.join(temp_folder, str(de_bruijn_graph) + ".dot"), view=True)

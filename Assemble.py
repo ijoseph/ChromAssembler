@@ -6,13 +6,16 @@ Implements Assembler, an assembly class runner, and
 DeBruijnGraph, an assembler adapted from Dr. Ben Langmead:
 http://www.langmead-lab.org/teaching-materials/.
 """
-import argparse, sys, multiprocessing, math, logging
+import argparse, sys, math, logging
 
 
 class Assembler(object):
     """
     Performs file handing and uses an `assembler_name`-type assembler to assemble reads
     """
+
+
+
     def __init__(self, fragments_fasta, assembler_name ="DeBrujinGraph"):
         """
         Constructor: set assembler based on name, read in fragments
@@ -36,6 +39,7 @@ class Assembler(object):
         """
         all_fragments = []
         this_fragment = []
+        max_line_len = 0
         for line in fragments_fasta:
             if line.startswith(">"): # Header line
                 if len(this_fragment): # If we have been reading fragment, finish doing so
@@ -45,7 +49,29 @@ class Assembler(object):
 
             this_fragment += [line.strip()] # Add to current fragment
 
+            if len(line.strip()) > max_line_len:
+                self.line_length = len(line.strip()) # record line length for later printing
+                max_line_len = len(line.strip())
         return all_fragments + ["".join(this_fragment)]
+
+
+    def write_fasta(self, assembled_sequence, output):
+        """
+        Write FASTA format of sequence, using line lengths learned during reading
+
+        :param assembled_sequence: sequence to write as fasta format
+        :param output: where to write fasta format; object with .write() method.
+        """
+
+        output.write(">assembled_sequence\n")
+
+        seq_len = len(assembled_sequence)
+        i = 0
+        while i < seq_len:
+            output.write(assembled_sequence[i:min(i+self.line_length, seq_len)] + "\n")
+            i += self.line_length
+
+
 
 class DeBruijnGraph:
     """ De Bruijn directed multigraph built from a collection of
@@ -251,7 +277,8 @@ def main():
     namespace = parser.parse_args()
 
     assembler = Assembler(fragments_fasta=namespace.fragments)
-    namespace.output.write(assembler.assemble())
+    assembled_sequence = assembler.assemble()
+    assembler.write_fasta(assembled_sequence, output=namespace.output)
 
 if __name__ == '__main__':
     main()
