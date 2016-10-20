@@ -5,7 +5,10 @@
 import argparse, sys, multiprocessing, os
 import graphviz
 import itertools
-
+import seaborn as sns
+import matplotlib.pyplot as plt
+import math
+import logging
 
 class Assembler(object):
     """
@@ -24,20 +27,20 @@ class Assembler(object):
 
     def assemble(self):
         if self.assembler == "DeBrujinGraph":
-            for k in range(502, 503):
-                dbg = DeBruijnGraph2(strIter=self.sequence_list, k=k)
+            chosen_k = self.choose_k()
+            dbg = DeBruijnGraph2(strIter=self.sequence_list, k=chosen_k)
 
-                self.output.write("k ={0}: {1}\n".format(k, dbg.is_eulerian()))
+            self.output.write("k ={0}: {1}\n".format(chosen_k, dbg.is_eulerian()))
 
-                # dot_file = dbg.to_dot()
-                # dot_file.render(filename=os.path.join(self.temp_folder,
-                #                                       "Figures/{0}_smol_example.dot").format(k), view=True)
+            # dot_file = dbg.to_dot()
+            # dot_file.render(filename=os.path.join(self.temp_folder,
+            #                                       "Figures/{0}_smol_example.dot").format(k), view=True)
 
 
-                if dbg.is_eulerian():
-                    # return "".join(dbg.eulerianWalkOrCycle())
-                    walk = dbg.get_eulerian_walk_or_cycle()
-                    return walk[0] + ''.join(map(lambda x: x[-1], walk[1:]))
+            if dbg.is_eulerian():
+                # return "".join(dbg.eulerianWalkOrCycle())
+                walk = dbg.get_eulerian_walk_or_cycle()
+                return walk[0] + ''.join(map(lambda x: x[-1], walk[1:]))
 
 
 
@@ -63,6 +66,25 @@ class Assembler(object):
 
         return all_sequences + ["".join(this_sequence)]
 
+    def choose_k(self):
+        """
+        Choose k for k-mer De Bruijin Graph assembly.
+        Chooses k as ⌊1/2 minimum read length⌋
+        :return:
+        """
+
+        min_read_length = min(map(len, self.sequence_list))
+
+        chosen_k = int(math.floor(.5 * min_read_length))
+
+        logging.info("Chosen k: {0}".format(chosen_k))
+
+        return chosen_k
+
+        # ax = sns.distplot(map(len, self.sequence_list))
+        # ax.set_title( label= "{0} is min".format(min(map(len,self.sequence_list))))
+        #
+        # plt.show()
 
 class DeBruijnGraph:
     """ De Bruijn directed multigraph built from a collection of
