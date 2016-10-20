@@ -21,9 +21,10 @@ class Assembler(object):
         """
         Constructor: set assembler based on name, read in fragments
         """
+        self.line_length = 0
         self.assembler_name = assembler_name
         self.fragment_list = self.read_fasta(fragments_fasta)
-        self.line_length = 0
+
 
         if self.assembler_name == "DeBruijnGraph":
             self.assembler = DeBruijnGraph(fragment_list=self.fragment_list)
