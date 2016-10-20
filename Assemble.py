@@ -2,7 +2,7 @@
 """
 @author: Isaac C. Joseph
 """
-import argparse, sys, multiprocessing
+import argparse, sys, multiprocessing, os
 import graphviz
 import itertools
 
@@ -12,29 +12,31 @@ class Assembler(object):
     Performs file handing and uses an assembler to assemble reads
     """
 
-    def __init__(self, fragments_fasta, assembler = "DeBrujinGraph", output = sys.stdout):
+    def __init__(self, fragments_fasta, temp_folder = ".", assembler = "DeBrujinGraph", output = sys.stdout):
         """
         Constructor
         """
         self.assembler = assembler
         self.output = output
+        self.temp_folder = temp_folder
 
         self.sequence_list = self.read_fasta(fragments_fasta)
 
     def assemble(self):
         if self.assembler == "DeBrujinGraph":
-            for k in range(8, 9):
+            for k in range(502, 503):
                 dbg = DeBruijnGraph2(strIter=self.sequence_list, k=k)
 
-                self.output.write("k ={0}: {1}\n".format(k, dbg.isEulerian()))
+                self.output.write("k ={0}: {1}\n".format(k, dbg.is_eulerian()))
 
-                dot_file = dbg.to_dot()
-                dot_file.render(filename="Figures/{0}_smol_example.dot".format(k), view=True)
+                # dot_file = dbg.to_dot()
+                # dot_file.render(filename=os.path.join(self.temp_folder,
+                #                                       "Figures/{0}_smol_example.dot").format(k), view=True)
 
 
-                if dbg.isEulerian():
+                if dbg.is_eulerian():
                     # return "".join(dbg.eulerianWalkOrCycle())
-                    walk = dbg.eulerianWalkOrCycle()
+                    walk = dbg.get_eulerian_walk_or_cycle()
                     return walk[0] + ''.join(map(lambda x: x[-1], walk[1:]))
 
 
@@ -101,10 +103,13 @@ class DeBruijnGraph:
         Build de Bruijn multigraph given string iterator and k-mer
             length k
         """
-        self.G = {}  # multimap from nodes to neighbors
+        self.graph = {}  # multimap from nodes to neighbors
         self.nodes = {}  # maps k-1-mers to Node objects
         seen_k_mers = set()
 
+        self.build_graph(k, seen_k_mers, strIter)
+
+    def build_graph(self, k, seen_k_mers, strIter):
         for sequence in strIter:
             for k_mer, k_minus_1_mer_left, k_minus_1_mer_right in self.chop(sequence, k):
                 if k_mer in seen_k_mers:
@@ -120,75 +125,81 @@ class DeBruijnGraph:
                     nodeR = self.nodes[k_minus_1_mer_right] = self.Node(k_minus_1_mer_right)
                 nodeL.out_degree += 1
                 nodeR.in_degree += 1
-                self.G.setdefault(nodeL, []).append(nodeR)
+                self.graph.setdefault(nodeL, []).append(nodeR)
+
+        self.assess_graph()
+
+    def assess_graph(self):
+        """
+        Keep track of head and tail nodes in the case of a graph with Eularian walk (not cycle); set tail and head
+        :return:
+        """
         # Iterate over nodes; tally # balanced, semi-balanced, neither
-        self.nsemi, self.nbal, self.nneither = 0, 0, 0
-        # Keep track of head and tail nodes in the case of a graph with
-        # Eularian walk (not cycle)
+        self.number_semi_balanced_nodes, self.number_balanced_nodes, self.number_unbalanced_nodes = 0, 0, 0
+
         self.head, self.tail = None, None
         for node in iter(self.nodes.values()):
             if node.is_balanced():
-                self.nbal += 1
+                self.number_balanced_nodes += 1
             elif node.is_semi_balanced():
                 if node.in_degree == node.out_degree + 1:
                     self.tail = node
                 if node.in_degree == node.out_degree - 1:
                     self.head = node
-                self.nsemi += 1
+                self.number_semi_balanced_nodes += 1
             else:
-                self.nneither += 1
+                self.number_unbalanced_nodes += 1
 
-    def nnodes(self):
+    def number_of_nodes(self):
         """ Return # nodes """
         return len(self.nodes)
 
-    def nedges(self):
+    def number_of_edges(self):
         """ Return # edges """
-        return len(self.G)
+        return len(self.graph)
 
-    def hasEulerianWalk(self):
+    def has_eulerian_walk(self):
         """ Return true iff graph has Eulerian walk. """
-        return self.nneither == 0 and self.nsemi == 2
+        return self.number_unbalanced_nodes == 0 and self.number_semi_balanced_nodes == 2
 
-    def hasEulerianCycle(self):
+    def has_eulerian_cycle(self):
         """ Return true iff graph has Eulerian cycle. """
-        return self.nneither == 0 and self.nsemi == 0
+        return self.number_unbalanced_nodes == 0 and self.number_semi_balanced_nodes == 0
 
-    def isEulerian(self):
+    def is_eulerian(self):
         """ Return true iff graph has Eulerian walk or cycle """
         # technically, if it has an Eulerian walk
-        return self.hasEulerianWalk() or self.hasEulerianCycle()
+        return self.has_eulerian_walk() or self.has_eulerian_cycle()
 
-    def eulerianWalkOrCycle(self):
-        """ Find and return sequence of nodes (represented by
+    def get_eulerian_walk_or_cycle(self):
+        """
+        Find and return sequence of nodes (represented by
             their k-1-mer labels) corresponding to Eulerian walk
-            or cycle """
-        assert self.isEulerian()
-        g = self.G
-        if self.hasEulerianWalk():
-            g = g.copy()
-            g.setdefault(self.tail, []).append(self.head)
-        # graph g has an Eulerian cycle
+            or cycle
+        """
+        assert self.is_eulerian() # graph g has an Eulerian cycle
+        graph_copy = self.graph
+
+        if self.has_eulerian_walk():
+            graph_copy = graph_copy.copy()
+            graph_copy.setdefault(self.tail, []).append(self.head)
+
         tour = []
-        src = next(iter(g.keys()))  # pick arbitrary starting node
+        source_node = next(iter(graph_copy.keys()))
 
-        def __visit(n):
-            while len(g[n]) > 0:
-                dst = g[n].pop()
-                __visit(dst)
-            tour.append(n)
+        node = source_node
+        while len(graph_copy[node]) > 0 :
+            node = graph_copy[node].pop() # move to neighboring node and continue
+            tour.append(node)
 
-        __visit(src)
-        tour = tour[::-1][:-1]  # reverse and then take all but last node
 
-        if self.hasEulerianWalk():
+        if self.has_eulerian_walk():
             # Adjust node list so that it starts at head and ends at tail
             sti = tour.index(self.head)
             tour = tour[sti:] + tour[:sti]
 
-        # Return node list
+        # Return node list as string
         return list(map(str, tour))
-
 
 
 class DeBruijnGraph2(DeBruijnGraph):
@@ -198,9 +209,9 @@ class DeBruijnGraph2(DeBruijnGraph):
             with weights, instead of drawing separate edges for
             k-1-mer copies. """
         g = graphviz.Digraph(comment='DeBruijn graph')
-        for node in iter(self.G.keys()):
+        for node in iter(self.graph.keys()):
             g.node(node.k_minus_1_mer, node.k_minus_1_mer)
-        for src, dsts in iter(self.G.items()):
+        for src, dsts in iter(self.graph.items()):
             if weights:
                 weightmap = {}
                 if weights:
@@ -264,6 +275,11 @@ class ShortestCommonSuperstring:
 
 
 def main():
+    # sys.setrecursionlimit(int(1e6))
+    import resource
+    # resource.setrlimit(resource.RLIMIT_STACK, (resource.RLIM_INFINITY, resource.RLIM_INFINITY))
+    # resource.setrlimit(resource.RLIMIT_STACK, (2 ** 10, 2**10))
+
     parser = argparse.ArgumentParser(description="description")
     parser.add_argument("--fragments", type=file, help="Input fragments in FASTA format")
     parser.add_argument('-o', '--output', type=argparse.FileType('w'), default=sys.stdout,
@@ -277,6 +293,8 @@ def main():
     #                       assembler="ShortestCommonSuperstring")
 
     assembler = Assembler(fragments_fasta=namespace.fragments)
+    namespace.output.write(assembler.assemble())
+    print len(assembler.assemble())
 
 
 
