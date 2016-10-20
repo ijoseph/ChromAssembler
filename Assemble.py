@@ -6,7 +6,10 @@ Implements Assembler, an assembly class runner, and
 DeBruijnGraph, an assembler adapted from Dr. Ben Langmead:
 http://www.langmead-lab.org/teaching-materials/.
 """
-import argparse, sys, math, logging
+import argparse
+import logging
+import math
+import sys
 
 
 class Assembler(object):
@@ -14,19 +17,18 @@ class Assembler(object):
     Performs file handing and uses an `assembler_name`-type assembler to assemble reads
     """
 
-
-
-    def __init__(self, fragments_fasta, assembler_name ="DeBrujinGraph"):
+    def __init__(self, fragments_fasta, assembler_name="DeBruijnGraph"):
         """
         Constructor: set assembler based on name, read in fragments
         """
         self.assembler_name = assembler_name
         self.fragment_list = self.read_fasta(fragments_fasta)
+        self.line_length = 0
 
-        if self.assembler_name == "DeBrujinGraph":
+        if self.assembler_name == "DeBruijnGraph":
             self.assembler = DeBruijnGraph(fragment_list=self.fragment_list)
         else:
-            raise NotImplementedError("Assemblers other than DeBruijinGraph not implemented")
+            raise NotImplementedError("Assemblers other than DeBruijnGraph not implemented")
 
     def assemble(self):
         """ Simply tells assembler to do its work."""
@@ -41,19 +43,18 @@ class Assembler(object):
         this_fragment = []
         max_line_len = 0
         for line in fragments_fasta:
-            if line.startswith(">"): # Header line
-                if len(this_fragment): # If we have been reading fragment, finish doing so
+            if line.startswith(">"):  # Header line
+                if len(this_fragment):  # If we have been reading fragment, finish doing so
                     all_fragments += ["".join(this_fragment)]
                     this_fragment = []
                 continue
 
-            this_fragment += [line.strip()] # Add to current fragment
+            this_fragment += [line.strip()]  # Add to current fragment
 
             if len(line.strip()) > max_line_len:
-                self.line_length = len(line.strip()) # record line length for later printing
+                self.line_length = len(line.strip())  # record line length for later printing
                 max_line_len = len(line.strip())
         return all_fragments + ["".join(this_fragment)]
-
 
     def write_fasta(self, assembled_sequence, output):
         """
@@ -70,7 +71,6 @@ class Assembler(object):
         while i < seq_len:
             output.write(assembled_sequence[i:min(i+self.line_length, seq_len)] + "\n")
             i += self.line_length
-
 
 
 class DeBruijnGraph:
@@ -116,11 +116,13 @@ class DeBruijnGraph:
         """
 
         self.fragment_list = fragment_list
+        self.number_semi_balanced_nodes, self.number_balanced_nodes, self.number_unbalanced_nodes = 0, 0, 0
+        self.tail, self.head = None, None
 
         self.graph = {}  # multimap from nodes to neighbors
         self.nodes = {}  # maps k-1-mers to Node objects
         self.chosen_k = self.choose_k()
-        self.build_graph(k= self.chosen_k, fragment_list=fragment_list)
+        self.build_graph(k=self.chosen_k, fragment_list=fragment_list)
 
     def choose_k(self):
         """
@@ -154,20 +156,20 @@ class DeBruijnGraph:
 
                 # Find left and right k-1-mers if already part of the graph
                 if k_minus_1_mer_left in self.nodes:
-                    nodeL = self.nodes[k_minus_1_mer_left]
+                    left_node = self.nodes[k_minus_1_mer_left]
                 else:
-                    nodeL = self.nodes[k_minus_1_mer_left] = self.Node(k_minus_1_mer_left)
+                    left_node = self.nodes[k_minus_1_mer_left] = self.Node(k_minus_1_mer_left)
                 if k_minus_1_mer_right in self.nodes:
-                    nodeR = self.nodes[k_minus_1_mer_right]
+                    right_node = self.nodes[k_minus_1_mer_right]
                 else:
-                    nodeR = self.nodes[k_minus_1_mer_right] = self.Node(k_minus_1_mer_right)
+                    right_node = self.nodes[k_minus_1_mer_right] = self.Node(k_minus_1_mer_right)
 
                 # Record increased degrees
-                nodeL.out_degree += 1
-                nodeR.in_degree += 1
+                left_node.out_degree += 1
+                right_node.in_degree += 1
 
                 # Add this edge from the left and right k-m-mer
-                self.graph.setdefault(nodeL, []).append(nodeR)
+                self.graph.setdefault(left_node, []).append(right_node)
 
         self.assess_graph()
 
@@ -220,7 +222,7 @@ class DeBruijnGraph:
             their k-1-mer labels) corresponding to Eulerian walk
             or cycle
         """
-        assert self.is_eulerian() # graph g has an Eulerian cycle
+        assert self.is_eulerian()  # graph g has an Eulerian cycle
         graph_copy = self.graph
 
         if self.has_eulerian_walk():
@@ -231,10 +233,9 @@ class DeBruijnGraph:
         source_node = next(iter(graph_copy.keys()))
 
         node = source_node
-        while len(graph_copy[node]) > 0 :
-            node = graph_copy[node].pop() # move to neighboring node and continue
+        while len(graph_copy[node]) > 0:
+            node = graph_copy[node].pop()  # move to neighboring node and continue
             tour.append(node)
-
 
         if self.has_eulerian_walk():
             # Adjust node list so that it starts at head and ends at tail
@@ -247,11 +248,11 @@ class DeBruijnGraph:
     def assemble(self):
         """ Assemble by finding the Eulerian walk if possible"""
         assert self.is_eulerian(), \
-            "Cannot assemble these fragments with k = {0}; " \
+            "Cannot assemble these fragments with k = {0};  because can't make de Bruijn graph Eulerian\n" \
             "try specifying k to be different than the above?".format(self.choose_k())
 
         # return "".join(dbg.eulerianWalkOrCycle())
-        walk = self.get_eulerian_walk_or_cycle() # walk is a list of Nodes
+        walk = self.get_eulerian_walk_or_cycle()  # walk is a list of Nodes
 
         # Each node contributes one character to the output fragment
         return walk[0] + ''.join(map(lambda x: x[-1], walk[1:]))

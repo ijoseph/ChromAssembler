@@ -5,8 +5,11 @@ import matplotlib.pyplot as plt
 
 
 class DeBruijnGraphVisualize:
+    def __init__(self):
+        pass
+
     @staticmethod
-    def to_dot(de_bruijn_graph, weights=False):
+    def to_dot(de_bruijn_graph):
         """ Return string with graphviz representation.  If 'weights'
             is true, label edges corresponding to distinct k-1-mers
             with weights, instead of drawing separate edges for
@@ -23,7 +26,7 @@ class DeBruijnGraphVisualize:
         return g
 
     @staticmethod
-    def show_graph(de_bruijn_graph, temp_folder = "."):
+    def show_graph(de_bruijn_graph, temp_folder="."):
         """
         Show graphviz plot from graph
         :param de_bruijn_graph: Assemble.DeBruijnGraph object
@@ -31,7 +34,6 @@ class DeBruijnGraphVisualize:
         """
         dot_string = DeBruijnGraphVisualize.to_dot(de_bruijn_graph)
         dot_string.render(filename=os.path.join(temp_folder, str(de_bruijn_graph) + ".dot"), view=True)
-
 
     @staticmethod
     def show_fragment_length_distribution(de_bruijn_graph):
@@ -41,7 +43,5 @@ class DeBruijnGraphVisualize:
         """
         lengths = map(len, de_bruijn_graph.fragment_list)
         ax = sns.distplot(lengths)
-        ax.set_title(label= "Length distribution of {0} fragments".format(len(lengths)))
+        ax.set_title(label="Length distribution of {0} fragments".format(len(lengths)))
         plt.show()
-
-
