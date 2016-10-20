@@ -19,7 +19,7 @@ class TestAssembler(TestCase):
         """ If it's impossible to make the graph Eulerian, output an understandable error"""
 
         non_eulerian_assembler = Assemble.Assembler(fragments_fasta=
-                                                    file("Data/coding_challenge_data_set_example_non_eulerian.txt"))
+                                                    file("Data/coding_challenge_data_set_example_made_non_eulerian.txt"))
 
         # Gives a reasonable error
         with self.assertRaises(AssertionError):

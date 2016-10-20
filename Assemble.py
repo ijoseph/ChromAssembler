@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-@author: Isaac C. Joseph
+@author: Isaac C. Joseph ijoseph@berkeley.edu
 """
 import argparse, sys, multiprocessing, os
 import graphviz
@@ -12,25 +12,21 @@ import logging
 
 class Assembler(object):
     """
-    Performs file handing and uses an assembler_name to assemble reads
+    Performs file handing and uses an 'assembler_name' assembler to assemble reads
     """
-
-    def __init__(self, fragments_fasta, temp_folder = ".", assembler = "DeBrujinGraph", output = sys.stdout):
+    def __init__(self, fragments_fasta, assembler_name ="DeBrujinGraph"):
         """
-        Constructor
+        Constructor - set assembler name, read in sequences
         """
-        self.assembler_name = assembler
-        self.output = output
-        self.temp_folder = temp_folder
-
+        self.assembler_name = assembler_name
         self.sequence_list = self.read_fasta(fragments_fasta)
 
     def assemble(self):
-        """ Chooses the approrpiate assembler and tells it to assemble"""
+        """ Chooses the appropriate assembler and tells it to assemble"""
         if self.assembler_name == "DeBrujinGraph":
             assembler= DeBruijnGraph2(sequence_list=self.sequence_list)
         else:
-            raise NotImplementedError("Assemblers beyond DeBruijinGraph")
+            raise NotImplementedError("Assemblers beyond DeBruijinGraph not implemented")
 
         return assembler.assemble()
 
@@ -106,8 +102,6 @@ class DeBruijnGraph:
         chosen_k = self.choose_k()
         self.build_graph(k= chosen_k, sequence_list=sequence_list)
 
-
-
     def choose_k(self):
         """
         Choose k for k-mer De Bruijin Graph assembly.
@@ -122,7 +116,6 @@ class DeBruijnGraph:
         logging.info("Chosen k: {0}".format(chosen_k))
 
         return chosen_k
-
 
     def build_graph(self, k, sequence_list):
 
@@ -254,8 +247,6 @@ class DeBruijnGraph2(DeBruijnGraph):
                     g.edge(src.k_minus_1_mer, dst.k_minus_1_mer)
         return g
 
-
-
 def main():
     parser = argparse.ArgumentParser(description="description")
     parser.add_argument("--fragments", type=file, help="Input fragments in FASTA format")
@@ -266,16 +257,8 @@ def main():
     parser.add_argument('--tempFolder', default="temp/", help="temporary folder for files [./temp]")
     namespace = parser.parse_args()
 
-    # assembler_name = Assembler(fragments_fasta=namespace.fragments, output=namespace.output,
-    #                       assembler_name="ShortestCommonSuperstring")
-
     assembler = Assembler(fragments_fasta=namespace.fragments)
     namespace.output.write(assembler.assemble())
-    print len(assembler.assemble())
-
-
-
-
 
 
 if __name__ == '__main__':
