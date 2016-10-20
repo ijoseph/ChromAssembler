@@ -25,3 +25,6 @@ class TestAssembler(TestCase):
         with self.assertRaises(AssertionError):
             non_eulerian_assembler.assemble()
 
+
+
+

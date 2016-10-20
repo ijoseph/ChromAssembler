@@ -2,13 +2,8 @@
 """
 @author: Isaac C. Joseph ijoseph@berkeley.edu
 """
-import argparse, sys, multiprocessing, os
-import graphviz
-import itertools
-import seaborn as sns
-import matplotlib.pyplot as plt
-import math
-import logging
+import argparse, sys, multiprocessing, math, logging
+
 
 class Assembler(object):
     """
@@ -47,12 +42,6 @@ class Assembler(object):
             this_sequence += [line.strip()] # Add to current sequence
 
         return all_sequences + ["".join(this_sequence)]
-
-
-        # ax = sns.distplot(map(len, self.sequence_list))
-        # ax.set_title( label= "{0} is min".format(min(map(len,self.sequence_list))))
-        #
-        # plt.show()
 
 
 class DeBruijnGraph:
@@ -99,8 +88,8 @@ class DeBruijnGraph:
 
         self.graph = {}  # multimap from nodes to neighbors
         self.nodes = {}  # maps k-1-mers to Node objects
-        chosen_k = self.choose_k()
-        self.build_graph(k= chosen_k, sequence_list=sequence_list)
+        self.chosen_k = self.choose_k()
+        self.build_graph(k= self.chosen_k, sequence_list=sequence_list)
 
     def choose_k(self):
         """
@@ -213,9 +202,7 @@ class DeBruijnGraph:
         return list(map(str, tour))
 
     def assemble(self):
-        # dot_file = dbg.to_dot()
-        # dot_file.render(filename=os.path.join(self.temp_folder,
-        #                                       "Figures/{0}_smol_example.dot").format(k), view=True)
+
 
         assert self.is_eulerian(), \
             "Cannot assemble these sequences with k = {0}; " \
@@ -225,27 +212,20 @@ class DeBruijnGraph:
         walk = self.get_eulerian_walk_or_cycle()
         return walk[0] + ''.join(map(lambda x: x[-1], walk[1:]))
 
-class DeBruijnGraph2(DeBruijnGraph):
-    def to_dot(self, weights=False):
-        """ Return string with graphviz representation.  If 'weights'
-            is true, label edges corresponding to distinct k-1-mers
-            with weights, instead of drawing separate edges for
-            k-1-mer copies. """
-        g = graphviz.Digraph(comment='DeBruijn graph')
-        for node in iter(self.graph.keys()):
-            g.node(node.k_minus_1_mer, node.k_minus_1_mer)
-        for src, dsts in iter(self.graph.items()):
-            if weights:
-                weightmap = {}
-                if weights:
-                    for dst in dsts:
-                        weightmap[dst] = weightmap.get(dst, 0) + 1
-                for dst, v in weightmap.iteritems():
-                    g.edge(src.k_minus_1_mer, dst.k_minus_1_mer, label=str(v))
-            else:
-                for dst in dsts:
-                    g.edge(src.k_minus_1_mer, dst.k_minus_1_mer)
-        return g
+    def __str__(self):
+        """ String representation"""
+        output = "De Bruijn Graph; k= {0} with {1} nodes, {2} edges".format(self.chosen_k,
+                                                                            self.number_of_nodes(),
+                                                                            self.number_of_edges())
+        if self.is_eulerian():
+            output += " which is Eulerian"
+        else:
+            output += " which is NOT Eulerian"
+
+        return output
+
+
+
 
 def main():
     parser = argparse.ArgumentParser(description="description")
@@ -259,7 +239,6 @@ def main():
 
     assembler = Assembler(fragments_fasta=namespace.fragments)
     namespace.output.write(assembler.assemble())
-
 
 if __name__ == '__main__':
     main()
