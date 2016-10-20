@@ -13,7 +13,7 @@ Assembles a chromosomal sequence from a `FASTA` text file contianing fragments u
 ### Algorithm
 
 1. Make de Bruijn graph by chopping fragments into k-mers
-  -k-mer length chosen by  ![choosing k](http://i.imgur.com/xgdp5kv.png)
+    - k-mer length chosen by <img src="http://i.imgur.com/xgdp5kv.png" width="200">
 2. Make Eulerian by:
     - Collapsing multi-edges into one by only considerng each k-mer once
     - Removing transitively-inferable edges
