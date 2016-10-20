@@ -12,37 +12,27 @@ import logging
 
 class Assembler(object):
     """
-    Performs file handing and uses an assembler to assemble reads
+    Performs file handing and uses an assembler_name to assemble reads
     """
 
     def __init__(self, fragments_fasta, temp_folder = ".", assembler = "DeBrujinGraph", output = sys.stdout):
         """
         Constructor
         """
-        self.assembler = assembler
+        self.assembler_name = assembler
         self.output = output
         self.temp_folder = temp_folder
 
         self.sequence_list = self.read_fasta(fragments_fasta)
 
     def assemble(self):
-        if self.assembler == "DeBrujinGraph":
-            chosen_k = self.choose_k()
-            dbg = DeBruijnGraph2(strIter=self.sequence_list, k=chosen_k)
+        """ Chooses the approrpiate assembler and tells it to assemble"""
+        if self.assembler_name == "DeBrujinGraph":
+            assembler= DeBruijnGraph2(sequence_list=self.sequence_list)
+        else:
+            raise NotImplementedError("Assemblers beyond DeBruijinGraph")
 
-            self.output.write("k ={0}: {1}\n".format(chosen_k, dbg.is_eulerian()))
-
-            # dot_file = dbg.to_dot()
-            # dot_file.render(filename=os.path.join(self.temp_folder,
-            #                                       "Figures/{0}_smol_example.dot").format(k), view=True)
-
-            assert dbg.is_eulerian(),\
-                "Cannot assemble these sequences with k = {0}; " \
-                "try specifying k to be different than the above?".format(chosen_k)
-            # return "".join(dbg.eulerianWalkOrCycle())
-            walk = dbg.get_eulerian_walk_or_cycle()
-            return walk[0] + ''.join(map(lambda x: x[-1], walk[1:]))
-
+        return assembler.assemble()
 
     def read_fasta(self, fragments_fasta):
         """
@@ -62,20 +52,6 @@ class Assembler(object):
 
         return all_sequences + ["".join(this_sequence)]
 
-    def choose_k(self):
-        """
-        Choose k for k-mer De Bruijin Graph assembly.
-        Chooses k as ⌊1/2 minimum read length⌋
-        :return:
-        """
-
-        min_read_length = min(map(len, self.sequence_list))
-
-        chosen_k = int(math.floor(.5 * min_read_length))
-
-        logging.info("Chosen k: {0}".format(chosen_k))
-
-        return chosen_k
 
         # ax = sns.distplot(map(len, self.sequence_list))
         # ax.set_title( label= "{0} is min".format(min(map(len,self.sequence_list))))
@@ -117,19 +93,42 @@ class DeBruijnGraph:
         def __str__(self):
             return self.k_minus_1_mer
 
-    def __init__(self, strIter, k):
+    def __init__(self, sequence_list):
         """
         Build de Bruijn multigraph given string iterator and k-mer
             length k
         """
+
+        self.sequence_list = sequence_list
+
         self.graph = {}  # multimap from nodes to neighbors
         self.nodes = {}  # maps k-1-mers to Node objects
+        chosen_k = self.choose_k()
+        self.build_graph(k= chosen_k, sequence_list=sequence_list)
+
+
+
+    def choose_k(self):
+        """
+        Choose k for k-mer De Bruijin Graph assembly.
+        Chooses k as ⌊1/2 minimum read length⌋
+        :return:
+        """
+
+        min_read_length = min(map(len, self.sequence_list))
+
+        chosen_k = int(math.floor(.5 * min_read_length))
+
+        logging.info("Chosen k: {0}".format(chosen_k))
+
+        return chosen_k
+
+
+    def build_graph(self, k, sequence_list):
+
         seen_k_mers = set()
 
-        self.build_graph(k, seen_k_mers, strIter)
-
-    def build_graph(self, k, seen_k_mers, strIter):
-        for sequence in strIter:
+        for sequence in sequence_list:
             for k_mer, k_minus_1_mer_left, k_minus_1_mer_right in self.chop(sequence, k):
                 if k_mer in seen_k_mers:
                     continue
@@ -220,6 +219,18 @@ class DeBruijnGraph:
         # Return node list as string
         return list(map(str, tour))
 
+    def assemble(self):
+        # dot_file = dbg.to_dot()
+        # dot_file.render(filename=os.path.join(self.temp_folder,
+        #                                       "Figures/{0}_smol_example.dot").format(k), view=True)
+
+        assert self.is_eulerian(), \
+            "Cannot assemble these sequences with k = {0}; " \
+            "try specifying k to be different than the above?".format(self.choose_k())
+
+        # return "".join(dbg.eulerianWalkOrCycle())
+        walk = self.get_eulerian_walk_or_cycle()
+        return walk[0] + ''.join(map(lambda x: x[-1], walk[1:]))
 
 class DeBruijnGraph2(DeBruijnGraph):
     def to_dot(self, weights=False):
@@ -255,8 +266,8 @@ def main():
     parser.add_argument('--tempFolder', default="temp/", help="temporary folder for files [./temp]")
     namespace = parser.parse_args()
 
-    # assembler = Assembler(fragments_fasta=namespace.fragments, output=namespace.output,
-    #                       assembler="ShortestCommonSuperstring")
+    # assembler_name = Assembler(fragments_fasta=namespace.fragments, output=namespace.output,
+    #                       assembler_name="ShortestCommonSuperstring")
 
     assembler = Assembler(fragments_fasta=namespace.fragments)
     namespace.output.write(assembler.assemble())
