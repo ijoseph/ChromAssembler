@@ -196,6 +196,10 @@ class DeBruijnGraph:
             else:
                 self.number_unbalanced_nodes += 1
 
+        logging.info("{0} . Has {1} balanced nodes, {2} semi-balanced nodes, and {3} unbalanced nodes.".format(
+            self, self.number_balanced_nodes, self.number_semi_balanced_nodes, self.number_unbalanced_nodes
+        ))
+
     def number_of_nodes(self):
         """ Return # nodes """
         return len(self.nodes)
@@ -273,10 +277,17 @@ class DeBruijnGraph:
 
 def main():
     parser = argparse.ArgumentParser(description="Assemble fragments using de Bruijn graph")
-    parser.add_argument("--fragments", type=file, help="Input fragments in FASTA format")
+    parser.add_argument("--fragments", type=file, help="Input fragments in FASTA format", required=True)
     parser.add_argument('-o', '--output', type=argparse.FileType('w'), default=sys.stdout,
                         help="Output assembled fragment to file [standard out]")
+    parser.add_argument("-v", "--verbose", help="increase output verbosity",
+                        action="store_true")
     namespace = parser.parse_args()
+
+    if namespace.verbose:
+        logging.basicConfig(level=logging.DEBUG)
+
+
 
     assembler = Assembler(fragments_fasta=namespace.fragments)
     assembled_sequence = assembler.assemble()
