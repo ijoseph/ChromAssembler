@@ -1,7 +1,7 @@
 from unittest import TestCase
 import Assemble
 
-class TestAssembler(TestCase):
+class TestAssemble(TestCase):
 
     def test_read_fasta(self):
         pass #self.fail()

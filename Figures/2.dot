@@ -1,7 +1,0 @@
-// DeBruijn graph
-digraph {
-	A [label=A]
-	C [label=C]
-	T [label=T]
-	G [label=G]
-}

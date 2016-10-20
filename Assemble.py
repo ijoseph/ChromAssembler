@@ -1,65 +1,69 @@
 # -*- coding: utf-8 -*-
 """
 @author: Isaac C. Joseph ijoseph@berkeley.edu
+
+Implements Assembler, an assembly class runner, and
+DeBruijnGraph, an assembler adapted from Dr. Ben Langmead:
+http://www.langmead-lab.org/teaching-materials/.
 """
 import argparse, sys, multiprocessing, math, logging
 
 
 class Assembler(object):
     """
-    Performs file handing and uses an 'assembler_name' assembler to assemble reads
+    Performs file handing and uses an `assembler_name`-type assembler to assemble reads
     """
     def __init__(self, fragments_fasta, assembler_name ="DeBrujinGraph"):
         """
-        Constructor - set assembler name, read in sequences
+        Constructor: set assembler based on name, read in fragments
         """
         self.assembler_name = assembler_name
-        self.sequence_list = self.read_fasta(fragments_fasta)
+        self.fragment_list = self.read_fasta(fragments_fasta)
+
+        if self.assembler_name == "DeBrujinGraph":
+            self.assembler = DeBruijnGraph(fragment_list=self.fragment_list)
+        else:
+            raise NotImplementedError("Assemblers other than DeBruijinGraph not implemented")
 
     def assemble(self):
-        """ Chooses the appropriate assembler and tells it to assemble"""
-        if self.assembler_name == "DeBrujinGraph":
-            assembler= DeBruijnGraph2(sequence_list=self.sequence_list)
-        else:
-            raise NotImplementedError("Assemblers beyond DeBruijinGraph not implemented")
-
-        return assembler.assemble()
+        """ Simply tells assembler to do its work."""
+        return self.assembler.assemble()
 
     def read_fasta(self, fragments_fasta):
         """
         Parses FASTA text file
-        :return: list of strings with each sequence
+        :return: list of fragment strings
         """
-        all_sequences = []
-        this_sequence = []
+        all_fragments = []
+        this_fragment = []
         for line in fragments_fasta:
             if line.startswith(">"): # Header line
-                if len(this_sequence): # If we have been reading sequence, finish doing so
-                    all_sequences += ["".join(this_sequence)]
-                    this_sequence = []
+                if len(this_fragment): # If we have been reading fragment, finish doing so
+                    all_fragments += ["".join(this_fragment)]
+                    this_fragment = []
                 continue
 
-            this_sequence += [line.strip()] # Add to current sequence
+            this_fragment += [line.strip()] # Add to current fragment
 
-        return all_sequences + ["".join(this_sequence)]
-
+        return all_fragments + ["".join(this_fragment)]
 
 class DeBruijnGraph:
     """ De Bruijn directed multigraph built from a collection of
-        strings. User supplies strings and k-mer length k.  Nodes
-        are k-1-mers.  An Edge corresponds to the k-mer that joins
+        strings. Nodes are k-1-mers.  An Edge corresponds to the k-mer that joins
         a left k-1-mer to a right k-1-mer. """
 
     @staticmethod
-    def chop(sequence, k):
-        """ Chop sequence into k-mers of given length """
-        for i in range(len(sequence) - (k - 1)):
-            yield (sequence[i:i + k], sequence[i:i + k - 1], sequence[i + 1:i + k])
+    def chop(fragment, k):
+        """ Chop fragment into k-mers of given length """
+        for i in range(len(fragment) - (k - 1)):
+            yield (fragment[i:i + k], fragment[i:i + k - 1], fragment[i + 1:i + k])
 
     class Node:
-        """ Node representing a k-1 mer.  Keep track of # of
-            incoming/outgoing edges so it's easy to check for
-            balanced, semi-balanced. """
+        """
+        Node representing a k-1 mer.  Keep track of # of
+        incoming/outgoing edges so it's easy to check for
+        balanced, semi-balanced.
+        """
 
         def __init__(self, k_minus_1_mer):
             self.k_minus_1_mer = k_minus_1_mer
@@ -73,23 +77,24 @@ class DeBruijnGraph:
             return self.in_degree == self.out_degree
 
         def __hash__(self):
+            """ Hash used for mapping nodes to neighbors"""
             return hash(self.k_minus_1_mer)
 
         def __str__(self):
             return self.k_minus_1_mer
 
-    def __init__(self, sequence_list):
+    def __init__(self, fragment_list):
         """
-        Build de Bruijn multigraph given string iterator and k-mer
-            length k
+        :param fragment_list: list of fragment strings for assembly
+        Initialize De Bruijn Graph, choosing k and building graph
         """
 
-        self.sequence_list = sequence_list
+        self.fragment_list = fragment_list
 
         self.graph = {}  # multimap from nodes to neighbors
         self.nodes = {}  # maps k-1-mers to Node objects
         self.chosen_k = self.choose_k()
-        self.build_graph(k= self.chosen_k, sequence_list=sequence_list)
+        self.build_graph(k= self.chosen_k, fragment_list=fragment_list)
 
     def choose_k(self):
         """
@@ -98,7 +103,7 @@ class DeBruijnGraph:
         :return:
         """
 
-        min_read_length = min(map(len, self.sequence_list))
+        min_read_length = min(map(len, self.fragment_list))
 
         chosen_k = int(math.floor(.5 * min_read_length))
 
@@ -106,15 +111,22 @@ class DeBruijnGraph:
 
         return chosen_k
 
-    def build_graph(self, k, sequence_list):
+    def build_graph(self, k, fragment_list):
+        """
+        Builds graph by chopping each fragment in fragment_list and linking
+        left k-1-mer to right k-1-mer
+        """
 
         seen_k_mers = set()
 
-        for sequence in sequence_list:
-            for k_mer, k_minus_1_mer_left, k_minus_1_mer_right in self.chop(sequence, k):
+        for fragment in fragment_list:
+            for k_mer, k_minus_1_mer_left, k_minus_1_mer_right in self.chop(fragment, k):
+                # if we've already seen this k-mer, continue because we don't want multi-edges. @ijoseph modification
                 if k_mer in seen_k_mers:
                     continue
                 seen_k_mers.add(k_mer)
+
+                # Find left and right k-1-mers if already part of the graph
                 if k_minus_1_mer_left in self.nodes:
                     nodeL = self.nodes[k_minus_1_mer_left]
                 else:
@@ -123,15 +135,20 @@ class DeBruijnGraph:
                     nodeR = self.nodes[k_minus_1_mer_right]
                 else:
                     nodeR = self.nodes[k_minus_1_mer_right] = self.Node(k_minus_1_mer_right)
+
+                # Record increased degrees
                 nodeL.out_degree += 1
                 nodeR.in_degree += 1
+
+                # Add this edge from the left and right k-m-mer
                 self.graph.setdefault(nodeL, []).append(nodeR)
 
         self.assess_graph()
 
     def assess_graph(self):
         """
-        Keep track of head and tail nodes in the case of a graph with Eularian walk (not cycle); set tail and head
+        Keep track of head and tail nodes in the case of a graph with Eularian walk (not cycle); set tail and head;
+        tally # of nodes balanced, semi-balanced, or unbalanced for later Eulerian check
         :return:
         """
         # Iterate over nodes; tally # balanced, semi-balanced, neither
@@ -173,7 +190,7 @@ class DeBruijnGraph:
 
     def get_eulerian_walk_or_cycle(self):
         """
-        Find and return sequence of nodes (represented by
+        Find and return fragment of nodes (represented by
             their k-1-mer labels) corresponding to Eulerian walk
             or cycle
         """
@@ -202,14 +219,15 @@ class DeBruijnGraph:
         return list(map(str, tour))
 
     def assemble(self):
-
-
+        """ Assemble by finding the Eulerian walk if possible"""
         assert self.is_eulerian(), \
-            "Cannot assemble these sequences with k = {0}; " \
+            "Cannot assemble these fragments with k = {0}; " \
             "try specifying k to be different than the above?".format(self.choose_k())
 
         # return "".join(dbg.eulerianWalkOrCycle())
-        walk = self.get_eulerian_walk_or_cycle()
+        walk = self.get_eulerian_walk_or_cycle() # walk is a list of Nodes
+
+        # Each node contributes one character to the output fragment
         return walk[0] + ''.join(map(lambda x: x[-1], walk[1:]))
 
     def __str__(self):
@@ -218,23 +236,18 @@ class DeBruijnGraph:
                                                                             self.number_of_nodes(),
                                                                             self.number_of_edges())
         if self.is_eulerian():
-            output += " which is Eulerian"
+            output += "; Eulerian"
         else:
-            output += " which is NOT Eulerian"
+            output += "; NOT Eulerian"
 
         return output
 
 
-
-
 def main():
-    parser = argparse.ArgumentParser(description="description")
+    parser = argparse.ArgumentParser(description="Assemble fragments using de Bruijn graph")
     parser.add_argument("--fragments", type=file, help="Input fragments in FASTA format")
     parser.add_argument('-o', '--output', type=argparse.FileType('w'), default=sys.stdout,
-                        help="Output assembled sequence to file [standard out]")
-    parser.add_argument('-p', '--numThreads', type=int, default=multiprocessing.cpu_count() / 2,
-                        help="Number of threads to run [(# of CPUs)/2]")
-    parser.add_argument('--tempFolder', default="temp/", help="temporary folder for files [./temp]")
+                        help="Output assembled fragment to file [standard out]")
     namespace = parser.parse_args()
 
     assembler = Assembler(fragments_fasta=namespace.fragments)

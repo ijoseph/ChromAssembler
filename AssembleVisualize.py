@@ -28,7 +28,7 @@ class DeBruijnGraphVisualize:
         :return:
         """
         dot_string = DeBruijnGraphVisualize.to_dot(de_bruijn_graph)
-        dot_string.render(filename=os.path.join(temp_folder, str(de_bruijn_graph)), view=True)
+        dot_string.render(filename=os.path.join(temp_folder, str(de_bruijn_graph) + ".dot"), view=True)
 
 
     @staticmethod
@@ -37,9 +37,9 @@ class DeBruijnGraphVisualize:
         Show fragment length distribution
         :return:
         """
-        lengths = map(len, de_bruijn_graph.sequence_list)
+        lengths = map(len, de_bruijn_graph.fragment_list)
         ax = sns.distplot(lengths)
-        ax.set_title(label= "Length distribution of {0} sequences".format(len(lengths)))
+        ax.set_title(label= "Length distribution of {0} fragments".format(len(lengths)))
         plt.show()
 
 
